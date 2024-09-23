@@ -413,44 +413,62 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, esekfom::esekf<state_ikf
   }
 }
 
-void ImuProcess::Process(const MeasureGroup &meas,  esekfom::esekf<state_ikfom, 12, input_ikfom> &kf_state, PointCloudXYZI::Ptr cur_pcl_un_)
+/**
+ * @brief 处理IMU数据并与激光雷达数据进行融合
+ * 
+ * 本函数的主要目的是处理传入的测量数据组(meas)，其中包含IMU数据和激光雷达数据，
+ * 并根据当前的状态对这些数据进行相应的处理。如果IMU数据需要初始化，则调用IMU_init
+ * 函数进行初始化；如果不需要初始化，则执行UndistortPcl函数来处理激光雷达点云数据。
+ * 
+ * @param meas 包含IMU和激光雷达数据的测量组
+ * @param kf_state 扩展卡尔曼滤波器的状态对象
+ * @param cur_pcl_un_ 当前未经畸变校正的点云数据指针
+ */
+void ImuProcess::Process(const MeasureGroup &meas, esekfom::esekf<state_ikfom, 12, input_ikfom> &kf_state, PointCloudXYZI::Ptr cur_pcl_)
 {
-  double t1,t2,t3;
+  double t1, t2, t3;
   t1 = omp_get_wtime();
 
-  if(meas.imu.empty()) {return;};
+  // 检查IMU数据是否为空，为空则直接返回
+  if (meas.imu.empty()) { return; }
+  // 确保激光雷达数据不为空
   ROS_ASSERT(meas.lidar != nullptr);
 
+  // 如果IMU需要初始化
   if (imu_need_init_)
   {
-    /// The very first lidar frame
+    // 执行IMU初始化
     IMU_init(meas, kf_state, init_iter_num);
 
-    imu_need_init_ = true;
+    // 设置IMU不需要再初始化
+    imu_need_init_ = false;
     
-    last_imu_   = meas.imu.back();
+    // 保存最后一个IMU数据用于后续处理
+    last_imu_ = meas.imu.back();
 
-    state_ikfom imu_state = kf_state.get_x();
+    // 如果初始化迭代次数超过最大值，认为IMU已经初始化完成
     if (init_iter_num > MAX_INI_COUNT)
     {
+      // 调整加速度计和陀螺仪的协方差矩阵
       cov_acc *= pow(G_m_s2 / mean_acc.norm(), 2);
       imu_need_init_ = false;
 
       cov_acc = cov_acc_scale;
       cov_gyr = cov_gyr_scale;
       ROS_INFO("IMU Initial Done");
-      // ROS_INFO("IMU Initial Done: Gravity: %.4f %.4f %.4f %.4f; state.bias_g: %.4f %.4f %.4f; acc covarience: %.8f %.8f %.8f; gry covarience: %.8f %.8f %.8f",\
-      //          imu_state.grav[0], imu_state.grav[1], imu_state.grav[2], mean_acc.norm(), cov_bias_gyr[0], cov_bias_gyr[1], cov_bias_gyr[2], cov_acc[0], cov_acc[1], cov_acc[2], cov_gyr[0], cov_gyr[1], cov_gyr[2]);
-      fout_imu.open(DEBUG_FILE_DIR("imu.txt"),ios::out);
+      // 打开调试文件用于记录IMU数据
+      fout_imu.open(DEBUG_FILE_DIR("imu.txt"), ios::out);
     }
 
     return;
   }
 
+  // 如果IMU不需要初始化，则执行点云畸变校正
   UndistortPcl(meas, kf_state, *cur_pcl_un_);
 
   t2 = omp_get_wtime();
   t3 = omp_get_wtime();
   
+  // 输出处理时间，用于性能调试
   // cout<<"[ IMU Process ]: Time: "<<t3 - t1<<endl;
 }
