@@ -1,0 +1,53 @@
+common:
+    lid_topic:  "/livox/lidar"    #话题信息
+    imu_topic:  "/livox/imu"
+    time_sync_en: false         # ONLY turn on when external time synchronization is really not possible
+    time_offset_lidar_to_imu: 0.0 # Time offset between lidar and IMU calibrated by other algorithms, e.g. LI-Init (can be found in README).
+                                  # This param will take effect no matter what time_sync_en is. So if the time offset is not known exactly, please set as 0.0
+
+preprocess:
+    lidar_type: 1                # 1 for Livox serials LiDAR, 2 for Velodyne LiDAR, 3 for ouster LiDAR, 
+    scan_line: 4    #scan_line：扫描数；决定水平方向的分辨率，数值越大点云数据越密集
+    blind: 0.5     #传感器周围的0.5m无法检测到反射信号        #blind（盲区）：激光雷达无法检测到反射信号的区域；
+                                                           #盲区越大，视为无效的点云越多，计算量减少；
+                                                           #盲区越小，有效点云越多，有利于室内避障
+
+mapping:
+    acc_cov: 0.1    #协方差用于描述加速度计测量值的精度和噪声水平，加速度计测量值的波动程度。
+                    #协方差值越大，表示测量值的噪声越大，不确定性越高
+                    #设置过大，会减小置信度
+                    #设置方法：根据加速度计制造商提供的技术规格，可以直接使用制造商给出的噪声参数来设置协方差。
+                            #制造商通常会提供诸如标准偏差（σ）之类的参数，协方差可以设置为标准偏差的平方，即σ²
+                            
+    gyr_cov: 0.1    #IMU的陀螺仪测量值的精度和噪声水平
+                    #协方差值越大，表示测量值的噪声越大，不确定性越高
+    
+    b_acc_cov: 0.0001    #b_acc_cov：加速度计偏差的协方差
+                         #精度下降：如果协方差设置得太小，系统可能会低估加速度计的偏差，导致滤波器性能下降和定位建图精度降低。
+                         #过度校正：如果协方差设置得过大，系统可能会过度校正加速度计的读数，这可能导致不必要的计算负担和系统不稳定。
+
+    b_gyr_cov: 0.0001    #用于描述陀螺仪测量值中系统偏差的不确定性
+                         #错误的b_gyr_cov设置可能会导致系统无法准确地补偿陀螺仪的偏差，从而降低定位和导航的精度
+                         #如果这个值设置得过大或过小，滤波器可能无法正确地处理陀螺仪的偏差，从而影响滤波器的性能和系统的稳定性
+                         
+    fov_degree:    360       #水平的扫描范围为360度
+    det_range:     100.0    #最大检测范围为100m；需要与激光雷达的实际性能相匹配
+    extrinsic_est_en:  false      # true: enable the online estimation of IMU-LiDAR extrinsic
+    extrinsic_T: [ -0.011, -0.02329, 0.04412 ]    #IMU和激光雷达之间的平移矩阵
+                                                  #这意味着IMU相对于激光雷达在x轴上向左偏移了0.011米，在y轴上向后偏移了0.02329米，在z轴上向上偏移了0.04412米              
+    extrinsic_R: [ 1, 0, 0,    #IMU相对于激光雷达的旋转矩阵，这里设置为单位矩阵，表示没有旋转
+                   0, 1, 0,    #表示IMU的x轴、y轴和z轴分别与激光雷达的x轴、y轴和z轴对齐
+                   0, 0, 1]
+
+publish:
+    path_en:  false    #false：不发布实时路径信息，可以减少系统的数据处理负担，节省计算资源和存储空间
+    scan_publish_en:  true       # false: close all the point cloud output
+    dense_publish_en: true       # true：系统会实时将密集的全局帧点云扫描数据发布到相应的发布话题上，供其他系统组件或外部客户端使用
+                                 # false: low down the points number in a global-frame point clouds scan.
+                                 
+    scan_bodyframe_pub_en: true  # true: output the point cloud scans in IMU-body-frame
+
+pcd_save:
+    pcd_save_en: true        
+    interval: -1                 # how many LiDAR frames saved in each pcd file; 
+                                 # -1 : all frames will be saved in ONE pcd file, may lead to memory crash when having too much frames.
